@@ -3,9 +3,11 @@ import 'package:flutter/material.dart';
 class AppTheme {
   // Paleta de colores 
   static const Color colorBackground = Color(0xFFF5F8F8);
+  static const Color colorBgSecondary = Color(0xFFFFFFFF); 
   static const Color colorTextPrimary = Color(0xFF000000);
   static const Color colorTextSecondary = Color(0xFFFFFFFF);
   static const Color colorPrimary = Color(0xFF03045E);
+  static const Color colorSecondary = Color(0xFFa2d2ff);
   static const Color colorError = Color(0xFF9B2226);
   static const Color colorTertiary = Color(0xFFE36414);
 
@@ -15,9 +17,11 @@ class AppTheme {
       scaffoldBackgroundColor: colorBackground,
       colorScheme: const ColorScheme.light(
         primary: colorPrimary,
-        secondary: colorTertiary,
+        secondary: colorSecondary,
+        tertiary: colorTertiary,
         error: colorError,
         surface: colorBackground,
+        surfaceContainer: colorBgSecondary,
       ),
       
       textTheme: const TextTheme(

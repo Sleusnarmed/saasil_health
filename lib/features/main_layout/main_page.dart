@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:saasil_health/features/home/home.dart';
 
 class MainPage extends StatefulWidget {
   const MainPage({super.key});
@@ -11,7 +12,7 @@ class _MainPageState extends State<MainPage> {
   int _currentIndex = 0;
 
   final List<Widget> _pages = [
-    const Center(child: Text('Pantalla de Inicio', style: TextStyle(fontSize: 24))),
+    HomePage(),
     const Center(child: Text('Pantalla de Historial', style: TextStyle(fontSize: 24))),
     const Center(child: Text('Pantalla de Chat IA', style: TextStyle(fontSize: 24))),
     const Center(child: Text('Pantalla de Recordatorios', style: TextStyle(fontSize: 24))),
