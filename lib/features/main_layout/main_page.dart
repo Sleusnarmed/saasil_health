@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:saasil_health/core/theme/app_theme.dart';
 import 'package:saasil_health/features/home/home.dart';
 
 class MainPage extends StatefulWidget {
@@ -11,8 +12,15 @@ class MainPage extends StatefulWidget {
 class _MainPageState extends State<MainPage> {
   int _currentIndex = 0;
 
+  final List<String> _appBarTitles = [
+    'Sáasil Health',
+    'Historial',
+    'Chat IA',
+    'Recordatorios',
+  ];
+
   final List<Widget> _pages = [
-    HomePage(),
+    HomePage(), 
     const Center(child: Text('Pantalla de Historial', style: TextStyle(fontSize: 24))),
     const Center(child: Text('Pantalla de Chat IA', style: TextStyle(fontSize: 24))),
     const Center(child: Text('Pantalla de Recordatorios', style: TextStyle(fontSize: 24))),
@@ -77,7 +85,6 @@ class _MainPageState extends State<MainPage> {
     );
   }
 
-  // Buttons of add
   Widget _buildMenuOption(BuildContext context, {required IconData icon, required Color color, required String title, required VoidCallback onTap}) {
     return ListTile(
       leading: CircleAvatar(
@@ -97,6 +104,21 @@ class _MainPageState extends State<MainPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      appBar: AppBar(
+        title: Text(
+          _appBarTitles[_currentIndex], 
+          style: const TextStyle(
+            fontWeight: FontWeight.bold,
+            letterSpacing: 0.5,
+          ),
+        ),
+        centerTitle: true, 
+        backgroundColor: AppTheme.colorBgSecondary,
+        surfaceTintColor: Colors.transparent, 
+        elevation: 1,
+        shadowColor: AppTheme.colorTextPrimary.withOpacity(0.2), 
+      ),
+
       body: IndexedStack(
         index: _currentIndex,
         children: _pages,
@@ -120,7 +142,7 @@ class _MainPageState extends State<MainPage> {
           children: [
             _buildNavItem(icon: Icons.home_rounded, label: 'Inicio', index: 0),
             _buildNavItem(icon: Icons.menu_book_rounded, label: 'Historial', index: 1),
-            const SizedBox(width: 48), // Espacio vacío para que encaje el botón flotante
+            const SizedBox(width: 48), 
             _buildNavItem(icon: Icons.smart_toy_rounded, label: 'Chat IA', index: 2),
             _buildNavItem(icon: Icons.notifications_rounded, label: 'Avisos', index: 3),
           ],
@@ -128,7 +150,6 @@ class _MainPageState extends State<MainPage> {
       ),
     );
   }
-
 
   Widget _buildNavItem({required IconData icon, required String label, required int index}) {
     final isSelected = _currentIndex == index;

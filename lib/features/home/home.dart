@@ -10,28 +10,12 @@ class HomePage extends StatelessWidget {
 
     return Scaffold(
       backgroundColor: AppTheme.colorBackground,
-      
-      appBar: AppBar(
-        backgroundColor: AppTheme.colorBackground,
-        elevation: 0,
-        centerTitle: false,
-        title: Text(
-          'Saasil Health', 
-          style: textTheme.titleLarge, 
-        ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.notifications_none_rounded, color: AppTheme.colorPrimary),
-            onPressed: () {},
-          ),
-          const SizedBox(width: 10),
-        ],
-      ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.only(left: 20, right: 20, top: 0, bottom: 80), 
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            const SizedBox(height: 25), 
             Text(
               "Buenos días, Alex", 
               style: textTheme.bodyLarge?.copyWith(color: AppTheme.colorTextPrimary), 
