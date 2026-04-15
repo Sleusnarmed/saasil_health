@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:saasil_health/core/theme/app_theme.dart';
 import 'package:saasil_health/features/home/home.dart';
+import 'package:saasil_health/features/insulin/insulin.dart';
 
 class MainPage extends StatefulWidget {
   const MainPage({super.key});
@@ -21,7 +22,7 @@ class _MainPageState extends State<MainPage> {
 
   final List<Widget> _pages = [
     HomePage(), 
-    const Center(child: Text('Pantalla de Historial', style: TextStyle(fontSize: 24))),
+    InsulinLogPage(),
     const Center(child: Text('Pantalla de Chat IA', style: TextStyle(fontSize: 24))),
     const Center(child: Text('Pantalla de Recordatorios', style: TextStyle(fontSize: 24))),
   ];
