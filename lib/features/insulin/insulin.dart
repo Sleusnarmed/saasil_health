@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../core/theme/app_theme.dart';
+import 'package:saasil_health/core/models/reg_insulin.dart';
+import '../../core/database/database_helper.dart';
 
 class InsulinLogPage extends StatefulWidget {
   const InsulinLogPage({super.key});
@@ -10,9 +12,82 @@ class InsulinLogPage extends StatefulWidget {
 
 class _InsulinLogPageState extends State<InsulinLogPage> {
   final TextEditingController _unitsController = TextEditingController();
-  String _selectedType = 'Bolo'; 
   DateTime _selectedDate = DateTime.now();
   TimeOfDay _selectedTime = TimeOfDay.now();
+
+  List<Map<String, dynamic>> _recentHistory = [];
+  bool _isLoadingHistory = true;
+  String _dayLabel = ""; 
+
+  final Map<String, List<String>> _insulinaData = {
+    'Acción Rápida': ['Aspart', 'Lispro', 'Glusilina'],
+    'Acción Corta': ['Regular'],
+    'Acción Intermedia': ['NPH'],
+    'Acción Prolongada': ['Glargina', 'Detemir', 'Degludec'],
+    'Inhalada': ['Polvo de insulina humana'],
+  };
+
+  String? _selectedCategory;
+  String? _selectedSubtype;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadHistory(); 
+  }
+
+  Future<void> _loadHistory() async {
+    try {
+      final db = await DatabaseHelper.instance.database;
+      
+      final List<Map<String, dynamic>> result = await db.rawQuery('''
+        SELECT r.unidades, r.fecha_hora, c.categoria, c.subtipo 
+        FROM ${DatabaseHelper.tableRegInsulina} r
+        INNER JOIN ${DatabaseHelper.tableCatTipoInsulina} c ON r.id_tipo_insu = c.id_tipo_insu
+        ORDER BY r.fecha_hora DESC
+      ''');
+
+      final now = DateTime.now();
+      final today = DateTime(now.year, now.month, now.day);
+      final yesterday = today.subtract(const Duration(days: 1));
+      
+      List<Map<String, dynamic>> todayLogs = [];
+      List<Map<String, dynamic>> yesterdayLogs = [];
+
+      for (var row in result) {
+        DateTime logDate = DateTime.parse(row['fecha_hora']);
+        DateTime logDay = DateTime(logDate.year, logDate.month, logDate.day);
+        
+        if (logDay == today) {
+          todayLogs.add(row);
+        } else if (logDay == yesterday) {
+          yesterdayLogs.add(row);
+        }
+      }
+
+      if (mounted) {
+        setState(() {
+          if (todayLogs.isNotEmpty) {
+            _recentHistory = todayLogs;
+            _dayLabel = "HOY";
+          } else if (yesterdayLogs.isNotEmpty) {
+            _recentHistory = yesterdayLogs;
+            _dayLabel = "AYER";
+          } else {
+            _recentHistory = []; 
+            _dayLabel = "";
+          }
+          _isLoadingHistory = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoadingHistory = false; // Apagamos el loading para que no se quede trabado
+        });
+      }
+    }
+  }
 
   Future<void> _selectDate(BuildContext context) async {
     final DateTime? picked = await showDatePicker(
@@ -62,19 +137,135 @@ class _InsulinLogPageState extends State<InsulinLogPage> {
     }
   }
 
-  void _saveEntry() {
-    final units = _unitsController.text;
-    print("Guardando: $units U de $_selectedType el $_selectedDate a las $_selectedTime");
-    
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: const Text('¡Registro guardado correctamente!', style: TextStyle(fontSize: 16)),
-        backgroundColor: AppTheme.colorPrimary,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+  void _showCategoryPicker() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: AppTheme.colorBgSecondary,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
+      builder: (context) {
+        return SafeArea(
+          child: Wrap(
+            children: _insulinaData.keys.map((category) {
+              return ListTile(
+                contentPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+                title: Text(category, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w600)),
+                trailing: const Icon(Icons.arrow_forward_ios, color: AppTheme.colorPrimary),
+                onTap: () {
+                  setState(() {
+                    _selectedCategory = category;
+                    if (_insulinaData[category]!.length == 1) {
+                      _selectedSubtype = _insulinaData[category]![0];
+                    } else {
+                      _selectedSubtype = null; 
+                    }
+                  });
+                  Navigator.pop(context);
+                },
+              );
+            }).toList(),
+          ),
+        );
+      },
     );
-    _unitsController.clear();
+  }
+
+  void _showSubtypePicker() {
+    if (_selectedCategory == null) return;
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: AppTheme.colorBgSecondary,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) {
+        return SafeArea(
+          child: Wrap(
+            children: _insulinaData[_selectedCategory]!.map((subtype) {
+              return ListTile(
+                contentPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+                title: Text(subtype, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w600)),
+                trailing: const Icon(Icons.check_circle_outline, color: AppTheme.colorPrimary),
+                onTap: () {
+                  setState(() {
+                    _selectedSubtype = subtype;
+                  });
+                  Navigator.pop(context);
+                },
+              );
+            }).toList(),
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _saveEntry() async {
+    final units = _unitsController.text;
+    
+    if (units.isEmpty || _selectedCategory == null || _selectedSubtype == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Por favor, completa todos los campos', style: TextStyle(fontSize: 16)),
+          backgroundColor: AppTheme.colorError,
+        ),
+      );
+      return;
+    }
+
+    try {
+      final db = await DatabaseHelper.instance.database;
+      final List<Map<String, dynamic>> resultado = await db.query(
+        DatabaseHelper.tableCatTipoInsulina,
+        where: 'categoria = ? AND subtipo = ?',
+        whereArgs: [_selectedCategory, _selectedSubtype],
+      );
+      
+      if (resultado.isNotEmpty) {
+        final int idTipoInsu = resultado.first['id_tipo_insu'];
+        
+        final nuevoRegistro = RegInsulina(
+          unidades: int.parse(units), 
+          idTipoInsu: idTipoInsu,
+          fechaHora: DateTime(
+            _selectedDate.year, _selectedDate.month, _selectedDate.day,
+            _selectedTime.hour, _selectedTime.minute
+          ),
+        );
+        
+        await db.insert(DatabaseHelper.tableRegInsulina, nuevoRegistro.toMap());
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: const Text('¡Registro guardado correctamente!', style: TextStyle(fontSize: 16)),
+              backgroundColor: AppTheme.colorPrimary,
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+          );
+          
+          setState(() {
+            _unitsController.clear();
+            _selectedCategory = null;
+            _selectedSubtype = null;
+          });
+
+          _loadHistory(); // RSe recarga automaticamente
+        }
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Error: No se encontró este tipo de insulina en la base de datos.', style: TextStyle(fontSize: 16)),
+            backgroundColor: Colors.orange,
+          ),
+        );
+      }
+    } catch (e) {
+      print("🚨 ERROR AL GUARDAR: $e");
+    }
   }
 
   @override
@@ -97,12 +288,6 @@ class _InsulinLogPageState extends State<InsulinLogPage> {
           onPressed: () => Navigator.pop(context),
         ),
         title: Text('Registro de Insulina', style: textTheme.titleLarge),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.more_vert, color: AppTheme.colorPrimary),
-            onPressed: () {},
-          ),
-        ],
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(20.0),
@@ -114,7 +299,7 @@ class _InsulinLogPageState extends State<InsulinLogPage> {
             TextField(
               controller: _unitsController,
               keyboardType: const TextInputType.numberWithOptions(decimal: true),
-              style: textTheme.displayLarge?.copyWith(fontSize: 28), // Número muy grande
+              style: textTheme.displayLarge?.copyWith(fontSize: 28),
               decoration: InputDecoration(
                 hintText: '0.0',
                 filled: true,
@@ -132,30 +317,27 @@ class _InsulinLogPageState extends State<InsulinLogPage> {
             ),
             const SizedBox(height: 20),
 
-            Text('Tipo de Insulina', style: textTheme.titleMedium),
+            Text('Tipo de Acción', style: textTheme.titleMedium),
             const SizedBox(height: 8),
-            Row(
-              children: [
-                Expanded(
-                  child: _buildTypeSelector(
-                    title: 'Bolo\n(Rápida / Comidas)',
-                    icon: Icons.restaurant,
-                    isSelected: _selectedType == 'Bolo',
-                    onTap: () => setState(() => _selectedType = 'Bolo'),
-                  ),
-                ),
-                const SizedBox(width: 15),
-                Expanded(
-                  child: _buildTypeSelector(
-                    title: 'Basal\n(Lenta / Fondo)',
-                    icon: Icons.bedtime,
-                    isSelected: _selectedType == 'Basal',
-                    onTap: () => setState(() => _selectedType = 'Basal'),
-                  ),
-                ),
-              ],
+            _buildLargeSelectionButton(
+              text: _selectedCategory ?? 'Toca para seleccionar',
+              icon: Icons.speed,
+              isPlaceholder: _selectedCategory == null,
+              onTap: _showCategoryPicker,
             ),
             const SizedBox(height: 20),
+
+            if (_selectedCategory != null) ...[
+              Text('Insulina Específica', style: textTheme.titleMedium),
+              const SizedBox(height: 8),
+              _buildLargeSelectionButton(
+                text: _selectedSubtype ?? 'Toca para elegir insulina',
+                icon: Icons.medication,
+                isPlaceholder: _selectedSubtype == null,
+                onTap: _insulinaData[_selectedCategory]!.length > 1 ? _showSubtypePicker : null,
+              ),
+              const SizedBox(height: 20),
+            ],
 
             Row(
               children: [
@@ -205,30 +387,81 @@ class _InsulinLogPageState extends State<InsulinLogPage> {
               ),
             ),
             const SizedBox(height: 40),
+            if (_isLoadingHistory)
+              const Center(child: CircularProgressIndicator(color: AppTheme.colorPrimary))
+            else if (_recentHistory.isEmpty)
+              const SizedBox.shrink() 
+            else ...[
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(Icons.history, color: Colors.grey),
+                      const SizedBox(width: 8),
+                      Text('Historial Reciente', style: textTheme.titleMedium),
+                    ],
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              Text(_dayLabel, style: textTheme.bodySmall?.copyWith(letterSpacing: 1.2, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 10),
 
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Row(
-                  children: [
-                    const Icon(Icons.history, color: Colors.grey),
-                    const SizedBox(width: 8),
-                    Text('Historial Reciente', style: textTheme.titleMedium),
-                  ],
+              ..._recentHistory.map((log) {
+                DateTime logDate = DateTime.parse(log['fecha_hora']);
+                String formattedTime = TimeOfDay.fromDateTime(logDate).format(context);
+                
+                return _buildHistoryCard(
+                  context, 
+                  units: log['unidades'].toString(), 
+                  type: "${log['categoria']} (${log['subtipo']})", 
+                  time: formattedTime, 
+                  icon: Icons.water_drop
+                );
+              }),
+            ]
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildLargeSelectionButton({
+    required String text, 
+    required IconData icon, 
+    required bool isPlaceholder, 
+    VoidCallback? onTap
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(15),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
+        decoration: BoxDecoration(
+          color: isPlaceholder ? AppTheme.colorBgSecondary : AppTheme.colorPrimary.withOpacity(0.05),
+          borderRadius: BorderRadius.circular(15),
+          border: Border.all(
+            color: isPlaceholder ? Colors.grey.shade300 : AppTheme.colorPrimary,
+            width: isPlaceholder ? 1 : 2,
+          ),
+        ),
+        child: Row(
+          children: [
+            Icon(icon, color: isPlaceholder ? Colors.grey : AppTheme.colorPrimary, size: 28),
+            const SizedBox(width: 15),
+            Expanded(
+              child: Text(
+                text,
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: isPlaceholder ? FontWeight.normal : FontWeight.bold,
+                  color: isPlaceholder ? Colors.grey.shade600 : AppTheme.colorPrimary,
                 ),
-                TextButton(
-                  onPressed: () {},
-                  child: const Text("Ver Todo", style: TextStyle(color: AppTheme.colorPrimary, fontWeight: FontWeight.bold)),
-                ),
-              ],
+              ),
             ),
-            const SizedBox(height: 10),
-            Text('HOY', style: textTheme.bodySmall?.copyWith(letterSpacing: 1.2, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 10),
-
-            // Lista Mockeada (Aquí iría un ListView.builder leyendo de la Base de Datos)
-            _buildHistoryCard(context, units: "8.5", type: "Bolo", time: "08:30 AM", icon: Icons.restaurant),
-            _buildHistoryCard(context, units: "12.0", type: "Bolo", time: "01:15 PM", icon: Icons.restaurant),
+            if (onTap != null) 
+              Icon(Icons.keyboard_arrow_down, color: isPlaceholder ? Colors.grey : AppTheme.colorPrimary),
           ],
         ),
       ),
@@ -257,36 +490,6 @@ class _InsulinLogPageState extends State<InsulinLogPage> {
     );
   }
 
-  Widget _buildTypeSelector({required String title, required IconData icon, required bool isSelected, required VoidCallback onTap}) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 8),
-        decoration: BoxDecoration(
-          color: isSelected ? AppTheme.colorPrimary : AppTheme.colorBgSecondary,
-          borderRadius: BorderRadius.circular(15),
-          border: Border.all(color: isSelected ? AppTheme.colorPrimary : Colors.grey.shade300),
-          boxShadow: isSelected ? [BoxShadow(color: AppTheme.colorPrimary.withOpacity(0.3), blurRadius: 8, offset: const Offset(0, 4))] : [],
-        ),
-        child: Column(
-          children: [
-            Icon(icon, size: 32, color: isSelected ? AppTheme.colorTextSecondary : AppTheme.colorPrimary),
-            const SizedBox(height: 8),
-            Text(
-              title,
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.bold,
-                color: isSelected ? AppTheme.colorTextSecondary : AppTheme.colorTextPrimary,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
   Widget _buildHistoryCard(BuildContext context, {required String units, required String type, required String time, required IconData icon}) {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -301,7 +504,7 @@ class _InsulinLogPageState extends State<InsulinLogPage> {
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: AppTheme.colorSecondary.withOpacity(0.2), // Light blue background
+              color: AppTheme.colorSecondary.withOpacity(0.2),
               shape: BoxShape.circle,
             ),
             child: Icon(icon, color: AppTheme.colorPrimary, size: 24),
@@ -317,7 +520,6 @@ class _InsulinLogPageState extends State<InsulinLogPage> {
               ],
             ),
           ),
-          const Icon(Icons.chevron_right, color: Colors.grey),
         ],
       ),
     );

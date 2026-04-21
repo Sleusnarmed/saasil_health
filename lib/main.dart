@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'features/main_layout/main_page.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
   runApp(const DiabetesApp());
 }
 
