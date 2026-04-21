@@ -2,16 +2,19 @@ import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
 
 class DatabaseHelper {
-
   static final DatabaseHelper instance = DatabaseHelper._init();
   static Database? _database;
 
   DatabaseHelper._init();
 
-  static const tableGlucose = 'glucose_logs';
-  static const tableInsulin = 'insulin_logs';
-  static const tableSymptoms = 'symptoms_logs';
-  static const tableReminders = 'reminders';
+  static const tableCatTipoInsulina = 'cat_tipo_insulina';
+  static const tableCatSintomas = 'cat_sintomas';
+  static const tableRegGlucosa = 'registros_glucosa';
+  static const tableRegInsulina = 'registros_insulina';
+  static const tableRegSintomas = 'registros_sintomas';
+  static const tableRelSintomasDetalle = 'rel_sintomas_detalle';
+  static const tableHistorialChat = 'historial_chat_ia';
+  static const tableConfigRecordatorios = 'config_recordatorios';
 
   Future<Database> get database async {
     if (_database != null) return _database!;
@@ -22,78 +25,147 @@ class DatabaseHelper {
   Future<Database> _initDB(String filePath) async {
     final dbPath = await getDatabasesPath();
     final path = join(dbPath, filePath);
-    return await openDatabase(path, version: 1, onCreate: _createDB);
+
+    return await openDatabase(
+      path,
+      version: 1,
+      onConfigure: _onConfigure, 
+      onCreate: _createDB,
+    );
+  }
+
+  Future _onConfigure(Database db) async {
+    await db.execute('PRAGMA foreign_keys = ON');
   }
 
   Future _createDB(Database db, int version) async {
-    const idType = 'INTEGER PRIMARY KEY AUTOINCREMENT';
-    const textType = 'TEXT NOT NULL';
-    const integerType = 'INTEGER NOT NULL';
-    const realType = 'REAL NOT NULL'; 
-  
     await db.execute('''
-    CREATE TABLE $tableGlucose (
-      id $idType,
-      level $realType,          /* Ej: 110.0 mg/dL */
-      timestamp $textType,      /* Fecha y hora exacta (ISO8601) */
-      notes TEXT                /* Opcional: "Después de comer", etc. */
+    CREATE TABLE $tableCatTipoInsulina (
+      id_tipo_insu INTEGER PRIMARY KEY AUTOINCREMENT,
+      categoria TEXT NOT NULL,
+      subtipo TEXT NOT NULL,
+      UNIQUE(categoria, subtipo)
     )
     ''');
 
     await db.execute('''
-    CREATE TABLE $tableInsulin (
-      id $idType,
-      units $integerType,       /* Ej: 12 unidades */
-      type $textType,           /* 'Bolo' (Rápida) o 'Basal' (Lenta) */
-      timestamp $textType,      /* Fecha y hora exacta (ISO8601) */
-      notes TEXT                /* Opcional */
+    CREATE TABLE $tableCatSintomas (
+      id_cat_sintoma INTEGER PRIMARY KEY AUTOINCREMENT,
+      nombre_sintoma TEXT NOT NULL UNIQUE
     )
     ''');
 
     await db.execute('''
-    CREATE TABLE $tableSymptoms (
-      id $idType,
-      symptom_name $textType,   /* Ej: 'Mareo', 'Sudoración' */
-      severity $integerType,    /* Ej: 1 al 5 (qué tan fuerte es) */
-      timestamp $textType,      /* Fecha y hora exacta (ISO8601) */
-      notes TEXT                /* Opcional */
+    CREATE TABLE $tableRegGlucosa (
+      id_glucosa INTEGER PRIMARY KEY AUTOINCREMENT,
+      valor INTEGER NOT NULL,
+      momento_dia TEXT NOT NULL,
+      fecha_hora TEXT DEFAULT CURRENT_TIMESTAMP,
+      notas TEXT
     )
     ''');
 
     await db.execute('''
-    CREATE TABLE $tableReminders (
-      id $idType,
-      title $textType,          /* Ej: 'Control Pre-almuerzo' */
-      reminder_type $textType,  /* 'Glucosa', 'Insulina', 'Otro' */
-      insulin_type TEXT,        /* 'Bolo' o 'Basal' (solo si es de insulina) */
-      time_scheduled $textType, /* Hora a la que debe sonar */
-      is_active $integerType,   /* 1 (Activo) o 0 (Inactivo) */
-      created_at $textType      /* Cuándo se creó el recordatorio */
+    CREATE TABLE $tableRegInsulina (
+      id_insulina INTEGER PRIMARY KEY AUTOINCREMENT,
+      unidades INTEGER NOT NULL,
+      id_tipo_insu INTEGER NOT NULL,
+      fecha_hora TEXT DEFAULT CURRENT_TIMESTAMP,
+      notas TEXT,
+      FOREIGN KEY (id_tipo_insu) REFERENCES $tableCatTipoInsulina (id_tipo_insu)
     )
     ''');
+
+    await db.execute('''
+    CREATE TABLE $tableRegSintomas (
+      id_reg_sintoma INTEGER PRIMARY KEY AUTOINCREMENT,
+      severidad TEXT NOT NULL,
+      fecha_hora TEXT DEFAULT CURRENT_TIMESTAMP,
+      notas TEXT
+    )
+    ''');
+
+    await db.execute('''
+    CREATE TABLE $tableRelSintomasDetalle (
+      id_detalle INTEGER PRIMARY KEY AUTOINCREMENT,
+      id_reg_sintoma INTEGER NOT NULL,
+      id_cat_sintoma INTEGER NOT NULL,
+      FOREIGN KEY (id_reg_sintoma) REFERENCES $tableRegSintomas (id_reg_sintoma) ON DELETE CASCADE,
+      FOREIGN KEY (id_cat_sintoma) REFERENCES $tableCatSintomas (id_cat_sintoma)
+    )
+    ''');
+
+    await db.execute('''
+    CREATE TABLE $tableHistorialChat (
+      id_chat INTEGER PRIMARY KEY AUTOINCREMENT,
+      pregunta TEXT NOT NULL,
+      respuesta TEXT NOT NULL,
+      fecha_hora TEXT DEFAULT CURRENT_TIMESTAMP
+    )
+    ''');
+
+    await db.execute('''
+    CREATE TABLE $tableConfigRecordatorios (
+      id_recordatorio INTEGER PRIMARY KEY AUTOINCREMENT,
+      titulo TEXT NOT NULL,
+      hora TEXT NOT NULL,
+      activo INTEGER DEFAULT 1
+    )
+    ''');
+
+    await _insertDefaultCatalogs(db);
   }
 
-  Future<int> insertGlucose(double level, {String? notes}) async {
-    final db = await instance.database;
-    final now = DateTime.now().toIso8601String(); 
+  Future _insertDefaultCatalogs(Database db) async {
 
-    return await db.insert(tableGlucose, {
-      'level': level,
-      'timestamp': now,
-      'notes': notes ?? '', 
+    await db.insert(tableCatTipoInsulina, {
+      'categoria': 'Acción Rápida',
+      'subtipo': 'Aspart',
     });
-  }
-
-  Future<int> insertInsulin(int units, String type, {String? notes}) async {
-    final db = await instance.database;
-    final now = DateTime.now().toIso8601String();
-
-    return await db.insert(tableInsulin, {
-      'units': units,
-      'type': type, 
-      'timestamp': now,
-      'notes': notes ?? '',
+    await db.insert(tableCatTipoInsulina, {
+      'categoria': 'Acción Rápida',
+      'subtipo': 'Lispro',
     });
+    await db.insert(tableCatTipoInsulina, {
+      'categoria': 'Acción Rápida',
+      'subtipo': 'Glusilina',
+    });
+    await db.insert(tableCatTipoInsulina, {
+      'categoria': 'Acción Corta',
+      'subtipo': 'Regular',
+    });
+    await db.insert(tableCatTipoInsulina, {
+      'categoria': 'Acción Intermedia',
+      'subtipo': 'NPH',
+    });
+    await db.insert(tableCatTipoInsulina, {
+      'categoria': 'Acción Prolongada',
+      'subtipo': 'Glargina',
+    });
+    await db.insert(tableCatTipoInsulina, {
+      'categoria': 'Acción Prolongada',
+      'subtipo': 'Detemir',
+    });
+    await db.insert(tableCatTipoInsulina, {
+      'categoria': 'Acción Prolongada',
+      'subtipo': 'Degludec',
+    });
+    await db.insert(tableCatTipoInsulina, {
+      'categoria': 'Inhalada',
+      'subtipo': 'Polvo de insulina humana',
+    });
+
+    final sintomasComunes = [
+      'Mareo',
+      'Sudoración',
+      'Visión Borrosa',
+      'Sed Extrema',
+      'Fatiga',
+    ];
+
+    for (String sintoma in sintomasComunes) {
+      await db.insert(tableCatSintomas, {'nombre_sintoma': sintoma});
+    }
   }
 
   Future close() async {
