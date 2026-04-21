@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import '../../core/theme/app_theme.dart';
 import '../home/home.dart';
 import '../insulin/insulin.dart';
-// import '../history/history_page.dart';
+import '../history/history.dart';
 // import '../chat/chat_ia_page.dart';
 // import '../reminders/reminders_page.dart';
 
@@ -131,7 +131,7 @@ class _MainPageState extends State<MainPage> {
   int _currentIndex = 0;
   final List<Widget> _pages = [
     const HomePage(),
-    const Center(child: Text("Historial (Simulado)")),
+    const HistoryPage(),
     const Center(child: Text("Chat IA (Simulado)")),
     const Center(child: Text("Avisos (Simulado)")),
   ];
