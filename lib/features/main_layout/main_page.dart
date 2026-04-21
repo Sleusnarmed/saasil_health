@@ -3,7 +3,7 @@ import '../../core/theme/app_theme.dart';
 import '../home/home.dart';
 import '../insulin/insulin.dart';
 import '../history/history.dart';
-// import '../chat/chat_ia_page.dart';
+import '../chat/chat.dart';
 // import '../reminders/reminders_page.dart';
 
 class MainPage extends StatefulWidget {
@@ -132,7 +132,7 @@ class _MainPageState extends State<MainPage> {
   final List<Widget> _pages = [
     const HomePage(),
     const HistoryPage(),
-    const Center(child: Text("Chat IA (Simulado)")),
+    const ChatPage(),
     const Center(child: Text("Avisos (Simulado)")),
   ];
 
