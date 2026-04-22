@@ -18,7 +18,7 @@ class DatabaseHelper {
 
   Future<Database> get database async {
     if (_database != null) return _database!;
-    _database = await _initDB('saasil_health_v2.db');
+    _database = await _initDB('saasil_health_v3.db');
     return _database!;
   }
 
@@ -115,6 +115,7 @@ class DatabaseHelper {
     ''');
 
     await _insertDefaultCatalogs(db);
+    await _insertDummyData(db);
   }
 
   Future _insertDefaultCatalogs(Database db) async {
@@ -164,6 +165,51 @@ class DatabaseHelper {
     ];
     for (String sintoma in sintomasComunes) {
       await db.insert(tableCatSintomas, {'nombre_sintoma': sintoma});
+    }
+  }
+
+  Future _insertDummyData(Database db) async {
+    final now = DateTime.now();
+
+    // 1. Insertar 7 registros de glucosa simulando los últimos 7 días
+    // Valores elegidos para mostrar alertas (rojos) y normales (verdes/blancos)
+    final valoresGlucosa = [
+      95,  // Día 1
+      110, // Día 2
+      65,  // Día 3 (Alerta baja)
+      120, // Día 4
+      160, // Día 5 (Alerta alta)
+      105, // Día 6
+      108, // Hoy (Día 7)
+    ];
+
+    for (int i = 0; i < valoresGlucosa.length; i++) {
+      // Restamos días para que parezca un historial real
+      final fecha = now.subtract(Duration(days: 6 - i)).toIso8601String();
+      
+      await db.insert(tableRegGlucosa, {
+        'valor': valoresGlucosa[i],
+        'momento_dia': 'Ayunas',
+        'fecha_hora': fecha,
+        'notas': 'Dato de prueba autogenerado',
+      });
+    }
+
+    // 2. Insertar registros de Insulina para calcular el promedio
+    final registrosInsulina = [
+      {'unidades': 12, 'diasAtras': 2},
+      {'unidades': 10, 'diasAtras': 1},
+      {'unidades': 11, 'diasAtras': 0},
+    ];
+
+    for (var reg in registrosInsulina) {
+      final fecha = now.subtract(Duration(days: reg['diasAtras'] as int)).toIso8601String();
+      await db.insert(tableRegInsulina, {
+        'unidades': reg['unidades'],
+        'id_tipo_insu': 1, // 'Acción Rápida - Aspart' según tus catálogos
+        'fecha_hora': fecha,
+        'notas': 'Dato de prueba autogenerado',
+      });
     }
   }
 

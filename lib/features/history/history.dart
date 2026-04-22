@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:saasil_health/features/history/statics_page.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/database/database_helper.dart';
-import './record_detail.dart'; 
+import './record_detail.dart';
 
 class HistoryPage extends StatefulWidget {
   const HistoryPage({super.key});
@@ -29,7 +30,20 @@ class _HistoryPageState extends State<HistoryPage> {
   }
 
   String _formatDate(DateTime date) {
-    const months = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+    const months = [
+      'ene',
+      'feb',
+      'mar',
+      'abr',
+      'may',
+      'jun',
+      'jul',
+      'ago',
+      'sep',
+      'oct',
+      'nov',
+      'dic',
+    ];
     return '${date.day} ${months[date.month - 1]}';
   }
 
@@ -52,7 +66,7 @@ class _HistoryPageState extends State<HistoryPage> {
       final fecha = DateTime.parse(row['fecha_hora'] as String);
       final valor = row['valor'] as int;
       final momento = row['momento_dia'] as String;
-      
+
       String statusText = 'Normal';
       IconData statusIcon = Icons.check;
       Color color = Colors.green;
@@ -63,7 +77,7 @@ class _HistoryPageState extends State<HistoryPage> {
         statusIcon = Icons.warning_amber_rounded;
         color = Colors.red;
         titleSufix = 'Hipoglucemia';
-      } else if (valor > 140) { 
+      } else if (valor > 140) {
         statusText = 'Alto';
         statusIcon = Icons.arrow_upward;
         color = Colors.orange;
@@ -78,9 +92,9 @@ class _HistoryPageState extends State<HistoryPage> {
         'statusIcon': statusIcon,
         'color': color,
         'icon': Icons.water_drop,
-        'timestamp': fecha, 
+        'timestamp': fecha,
         'rawRecord': row,
-        'recordType': RecordType.glucosa, 
+        'recordType': RecordType.glucosa,
       });
     }
 
@@ -90,7 +104,7 @@ class _HistoryPageState extends State<HistoryPage> {
       JOIN ${DatabaseHelper.tableCatTipoInsulina} c 
       ON r.id_tipo_insu = c.id_tipo_insu
     ''');
-    
+
     for (var row in insulinaRecords) {
       final fecha = DateTime.parse(row['fecha_hora'] as String);
       final unidades = row['unidades'] as int;
@@ -132,7 +146,10 @@ class _HistoryPageState extends State<HistoryPage> {
       });
     }
 
-    combinedData.sort((a, b) => (b['timestamp'] as DateTime).compareTo(a['timestamp'] as DateTime));
+    combinedData.sort(
+      (a, b) =>
+          (b['timestamp'] as DateTime).compareTo(a['timestamp'] as DateTime),
+    );
 
     setState(() {
       _historyData = combinedData;
@@ -145,7 +162,9 @@ class _HistoryPageState extends State<HistoryPage> {
     final textTheme = Theme.of(context).textTheme;
     final filteredData = _selectedFilter == 'Todos'
         ? _historyData
-        : _historyData.where((item) => item['type'] == _selectedFilter).toList();
+        : _historyData
+              .where((item) => item['type'] == _selectedFilter)
+              .toList();
 
     return Scaffold(
       backgroundColor: AppTheme.colorBackground,
@@ -158,122 +177,152 @@ class _HistoryPageState extends State<HistoryPage> {
           style: textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
         ),
       ),
-      body: _isLoading 
-        ? const Center(child: CircularProgressIndicator(color: AppTheme.colorPrimary))
-        : Column(
-        children: [
-          Container(
-            padding: const EdgeInsets.symmetric(vertical: 10),
-            decoration: BoxDecoration(
-              color: AppTheme.colorBackground,
-              border: Border(
-                bottom: BorderSide(color: Colors.grey.shade300, width: 1),
-              ),
-            ),
-            child: SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Row(
-                children: _filters.map((filter) {
-                  final isSelected = _selectedFilter == filter['label'];
-                  return Padding(
-                    padding: const EdgeInsets.only(right: 10),
-                    child: ChoiceChip(
-                      label: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          if (filter['icon'] != null) ...[
-                            Icon(
-                              filter['icon'],
-                              size: 18,
-                              color: isSelected
-                                  ? Colors.white
-                                  : Colors.grey.shade600,
-                            ),
-                            const SizedBox(width: 6),
-                          ],
-                          Text(
-                            filter['label'],
-                            style: TextStyle(
-                              color: isSelected ? Colors.white : Colors.black87,
-                              fontWeight: isSelected
-                                  ? FontWeight.bold
-                                  : FontWeight.normal,
-                            ),
-                          ),
-                        ],
-                      ),
-                      selected: isSelected,
-                      onSelected: (selected) {
-                        setState(() {
-                          _selectedFilter = filter['label'];
-                        });
-                      },
-                      selectedColor: AppTheme.colorPrimary, 
-                      backgroundColor: Colors.white, 
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(20),
-                        side: BorderSide(
-                          color: isSelected
-                              ? AppTheme.colorPrimary
-                              : Colors.grey.shade300,
-                        ),
-                      ),
-                      showCheckmark: false,
-                    ),
-                  );
-                }).toList(),
-              ),
-            ),
+      floatingActionButton: Padding(
+        padding: const EdgeInsets.only(
+          bottom: 125.0,
+        ), // Ajusta este número si necesitas subirlo más
+        child: FloatingActionButton.extended(
+          backgroundColor: AppTheme.colorPrimary,
+          icon: const Icon(Icons.analytics, color: Colors.white),
+          label: const Text(
+            'Ver Estadísticas',
+            style: TextStyle(color: Colors.white),
           ),
-
-          Expanded(
-            child: filteredData.isEmpty
-                ? Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.inbox, size: 64, color: Colors.grey.shade300),
-                        const SizedBox(height: 16),
-                        Text(
-                          'No hay registros de $_selectedFilter',
-                          style: TextStyle(color: Colors.grey.shade600, fontSize: 16),
-                        ),
-                      ],
+          onPressed: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => const StatisticsPage()),
+            );
+          },
+        ),
+      ),
+      body: _isLoading
+          ? const Center(
+              child: CircularProgressIndicator(color: AppTheme.colorPrimary),
+            )
+          : Column(
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(vertical: 10),
+                  decoration: BoxDecoration(
+                    color: AppTheme.colorBackground,
+                    border: Border(
+                      bottom: BorderSide(color: Colors.grey.shade300, width: 1),
                     ),
-                  )
-                : ListView.builder(
-                    padding: const EdgeInsets.all(16),
-                    itemCount: filteredData.length,
-                    itemBuilder: (context, index) {
-                      final item = filteredData[index];
-                      return _buildRecordCard(
-                        context: context,
-                        title: item['title'],
-                        subtitle: item['subtitle'],
-                        statusText: item['statusText'],
-                        statusIcon: item['statusIcon'],
-                        color: item['color'],
-                        icon: item['icon'],
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => RecordDetailPage(
-                                record: item['rawRecord'], 
-                                recordType: item['recordType'],
+                  ),
+                  child: SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: Row(
+                      children: _filters.map((filter) {
+                        final isSelected = _selectedFilter == filter['label'];
+                        return Padding(
+                          padding: const EdgeInsets.only(right: 10),
+                          child: ChoiceChip(
+                            label: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                if (filter['icon'] != null) ...[
+                                  Icon(
+                                    filter['icon'],
+                                    size: 18,
+                                    color: isSelected
+                                        ? Colors.white
+                                        : Colors.grey.shade600,
+                                  ),
+                                  const SizedBox(width: 6),
+                                ],
+                                Text(
+                                  filter['label'],
+                                  style: TextStyle(
+                                    color: isSelected
+                                        ? Colors.white
+                                        : Colors.black87,
+                                    fontWeight: isSelected
+                                        ? FontWeight.bold
+                                        : FontWeight.normal,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            selected: isSelected,
+                            onSelected: (selected) {
+                              setState(() {
+                                _selectedFilter = filter['label'];
+                              });
+                            },
+                            selectedColor: AppTheme.colorPrimary,
+                            backgroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(20),
+                              side: BorderSide(
+                                color: isSelected
+                                    ? AppTheme.colorPrimary
+                                    : Colors.grey.shade300,
                               ),
                             ),
-                          ).then((_) {
-                            _loadHistoryData();
-                          });
-                        },
-                      );
-                    },
+                            showCheckmark: false,
+                          ),
+                        );
+                      }).toList(),
+                    ),
                   ),
-          ),
-        ],
-      ),
+                ),
+
+                Expanded(
+                  child: filteredData.isEmpty
+                      ? Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.inbox,
+                                size: 64,
+                                color: Colors.grey.shade300,
+                              ),
+                              const SizedBox(height: 16),
+                              Text(
+                                'No hay registros de $_selectedFilter',
+                                style: TextStyle(
+                                  color: Colors.grey.shade600,
+                                  fontSize: 16,
+                                ),
+                              ),
+                            ],
+                          ),
+                        )
+                      : ListView.builder(
+                          padding: const EdgeInsets.all(16),
+                          itemCount: filteredData.length,
+                          itemBuilder: (context, index) {
+                            final item = filteredData[index];
+                            return _buildRecordCard(
+                              context: context,
+                              title: item['title'],
+                              subtitle: item['subtitle'],
+                              statusText: item['statusText'],
+                              statusIcon: item['statusIcon'],
+                              color: item['color'],
+                              icon: item['icon'],
+                              onTap: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => RecordDetailPage(
+                                      record: item['rawRecord'],
+                                      recordType: item['recordType'],
+                                    ),
+                                  ),
+                                ).then((_) {
+                                  _loadHistoryData();
+                                });
+                              },
+                            );
+                          },
+                        ),
+                ),
+              ],
+            ),
     );
   }
 
@@ -285,15 +334,15 @@ class _HistoryPageState extends State<HistoryPage> {
     required IconData statusIcon,
     required Color color,
     required IconData icon,
-    required VoidCallback onTap, 
+    required VoidCallback onTap,
   }) {
-    return GestureDetector( 
+    return GestureDetector(
       onTap: onTap,
       child: Container(
         margin: const EdgeInsets.only(bottom: 12),
         clipBehavior: Clip.antiAlias,
         decoration: BoxDecoration(
-          color: color.withOpacity(0.03), 
+          color: color.withOpacity(0.03),
           borderRadius: BorderRadius.circular(16),
           border: Border.all(color: color.withOpacity(0.3), width: 1),
           boxShadow: [
