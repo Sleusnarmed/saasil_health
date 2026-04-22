@@ -18,7 +18,7 @@ class DatabaseHelper {
 
   Future<Database> get database async {
     if (_database != null) return _database!;
-    _database = await _initDB('saasil_health.db');
+    _database = await _initDB('saasil_health_v2.db');
     return _database!;
   }
 
@@ -29,7 +29,7 @@ class DatabaseHelper {
     return await openDatabase(
       path,
       version: 1,
-      onConfigure: _onConfigure, 
+      onConfigure: _onConfigure,
       onCreate: _createDB,
     );
   }
@@ -109,6 +109,7 @@ class DatabaseHelper {
       id_recordatorio INTEGER PRIMARY KEY AUTOINCREMENT,
       titulo TEXT NOT NULL,
       hora TEXT NOT NULL,
+      frecuencia TEXT NOT NULL, -- NUEVO CAMPO AGREGADO
       activo INTEGER DEFAULT 1
     )
     ''');
@@ -117,7 +118,6 @@ class DatabaseHelper {
   }
 
   Future _insertDefaultCatalogs(Database db) async {
-
     await db.insert(tableCatTipoInsulina, {
       'categoria': 'Acción Rápida',
       'subtipo': 'Aspart',
@@ -162,7 +162,6 @@ class DatabaseHelper {
       'Sed Extrema',
       'Fatiga',
     ];
-
     for (String sintoma in sintomasComunes) {
       await db.insert(tableCatSintomas, {'nombre_sintoma': sintoma});
     }

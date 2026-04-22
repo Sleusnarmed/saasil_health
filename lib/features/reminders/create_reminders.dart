@@ -3,20 +3,20 @@ import '../../core/theme/app_theme.dart';
 import '../../core/models/config_reminder.dart';
 import '../../core/database/database_helper.dart';
 
-class RemindersPage extends StatefulWidget {
-  const RemindersPage({super.key});
+class CreateReminderPage extends StatefulWidget {
+  const CreateReminderPage({super.key});
 
   @override
-  State<RemindersPage> createState() => _RemindersPageState();
+  State<CreateReminderPage> createState() => _CreateReminderPageState();
 }
 
-class _RemindersPageState extends State<RemindersPage> {
+class _CreateReminderPageState extends State<CreateReminderPage> {
   final TextEditingController _titleController = TextEditingController();
   TimeOfDay? _selectedTime;
   String _selectedFrequency = 'Una vez';
   bool _isActive = true;
 
-  final List<String> _frequencies = ['Una vez', 'Diariamente', 'Semanalmente'];
+  final List<String> _frequencies = ['Una vez', 'Diario', 'Semanal', 'Personalizado'];
 
   Future<void> _selectTime(BuildContext context) async {
     final TimeOfDay? picked = await showTimePicker(
@@ -27,8 +27,8 @@ class _RemindersPageState extends State<RemindersPage> {
           data: Theme.of(context).copyWith(
             colorScheme: const ColorScheme.light(
               primary: AppTheme.colorPrimary,
-              onPrimary: AppTheme.colorTextSecondary, 
-              onSurface: AppTheme.colorTextPrimary,
+              onPrimary: Colors.white,
+              onSurface: Colors.black87,
             ),
           ),
           child: child!,
@@ -53,39 +53,30 @@ class _RemindersPageState extends State<RemindersPage> {
 
   Future<void> _saveReminder() async {
     if (_titleController.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Por favor ingresa un título')),
-      );
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Ingresa un título')));
       return;
     }
-
     if (_selectedTime == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Por favor selecciona una hora')),
-      );
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Selecciona una hora')));
       return;
     }
 
     final newReminder = ConfigRecordatorios(
       titulo: _titleController.text.trim(),
       hora: _formatTime(_selectedTime),
+      frecuencia: _selectedFrequency,
       activo: _isActive,
     );
 
     final db = await DatabaseHelper.instance.database;
-    await db.insert(
-      DatabaseHelper.tableConfigRecordatorios,
-      newReminder.toMap(),
-    );
+    await db.insert(DatabaseHelper.tableConfigRecordatorios, newReminder.toMap());
 
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Recordatorio guardado exitosamente'),
-          backgroundColor: Colors.green,
-        ),
+        const SnackBar(content: Text('Guardado exitosamente'), backgroundColor: Colors.green),
       );
-      Navigator.pop(context); 
+      // AQUÍ ESTÁ EL TRUCO: Pasamos 'true' de regreso
+      Navigator.pop(context, true);
     }
   }
 
@@ -100,17 +91,14 @@ class _RemindersPageState extends State<RemindersPage> {
     return Scaffold(
       backgroundColor: AppTheme.colorBackground,
       appBar: AppBar(
-        backgroundColor: AppTheme.colorBackground,
+        backgroundColor: Colors.transparent,
         elevation: 0,
         centerTitle: true,
         title: const Text(
           'Nuevo Recordatorio',
-          style: TextStyle(
-            color: AppTheme.colorTextPrimary,
-            fontWeight: FontWeight.bold,
-          ),
+          style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
         ),
-        iconTheme: const IconThemeData(color: AppTheme.colorPrimary),
+        iconTheme: const IconThemeData(color: Colors.black),
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(20.0),
@@ -143,10 +131,7 @@ class _RemindersPageState extends State<RemindersPage> {
                 decoration: _inputDecorationBox(),
                 child: Text(
                   _formatTime(_selectedTime),
-                  style: TextStyle(
-                    fontSize: 16,
-                    color: _selectedTime == null ? Colors.grey.shade400 : AppTheme.colorTextPrimary,
-                  ),
+                  style: TextStyle(fontSize: 16, color: _selectedTime == null ? Colors.grey.shade400 : Colors.black87),
                 ),
               ),
             ),
@@ -161,17 +146,12 @@ class _RemindersPageState extends State<RemindersPage> {
                 child: DropdownButton<String>(
                   value: _selectedFrequency,
                   isExpanded: true,
-                  icon: const Icon(Icons.keyboard_arrow_down, color: AppTheme.colorPrimary),
+                  icon: Icon(Icons.keyboard_arrow_down, color: AppTheme.colorPrimary),
                   items: _frequencies.map((String value) {
-                    return DropdownMenuItem<String>(
-                      value: value,
-                      child: Text(value),
-                    );
+                    return DropdownMenuItem<String>(value: value, child: Text(value));
                   }).toList(),
                   onChanged: (newValue) {
-                    setState(() {
-                      _selectedFrequency = newValue!;
-                    });
+                    setState(() { _selectedFrequency = newValue!; });
                   },
                 ),
               ),
@@ -181,22 +161,11 @@ class _RemindersPageState extends State<RemindersPage> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text(
-                  'Activar recordatorio',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: AppTheme.colorTextPrimary,
-                  ),
-                ),
+                const Text('Activar recordatorio', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                 Switch(
                   value: _isActive,
-                  onChanged: (value) {
-                    setState(() {
-                      _isActive = value;
-                    });
-                  },
-                  activeColor: AppTheme.colorPrimary,
+                  onChanged: (value) { setState(() { _isActive = value; }); },
+                  activeTrackColor: AppTheme.colorPrimary,
                 ),
               ],
             ),
@@ -213,17 +182,11 @@ class _RemindersPageState extends State<RemindersPage> {
                     onPressed: _saveReminder,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppTheme.colorPrimary,
-                      foregroundColor: Colors.white,
                       padding: const EdgeInsets.symmetric(vertical: 16),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                       elevation: 0,
                     ),
-                    child: const Text(
-                      'Guardar recordatorio',
-                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                    ),
+                    child: const Text('Guardar recordatorio', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white)),
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -232,17 +195,11 @@ class _RemindersPageState extends State<RemindersPage> {
                   child: OutlinedButton(
                     onPressed: () => Navigator.pop(context),
                     style: OutlinedButton.styleFrom(
-                      foregroundColor: AppTheme.colorTextPrimary,
                       side: BorderSide(color: Colors.grey.shade300),
                       padding: const EdgeInsets.symmetric(vertical: 16),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                     ),
-                    child: const Text(
-                      'Cancelar',
-                      style: TextStyle(fontSize: 16),
-                    ),
+                    child: const Text('Cancelar', style: TextStyle(fontSize: 16, color: Colors.black87)),
                   ),
                 ),
               ],
@@ -254,21 +211,10 @@ class _RemindersPageState extends State<RemindersPage> {
   }
 
   Widget _buildLabel(String text) {
-    return Text(
-      text,
-      style: const TextStyle(
-        fontSize: 14,
-        fontWeight: FontWeight.bold,
-        color: Color(0xFF4A5568), 
-      ),
-    );
+    return Text(text, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF4A5568)));
   }
 
   BoxDecoration _inputDecorationBox() {
-    return BoxDecoration(
-      color: Colors.white,
-      borderRadius: BorderRadius.circular(12),
-      border: Border.all(color: Colors.grey.shade300),
-    );
+    return BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12), border: Border.all(color: Colors.grey.shade300));
   }
 }

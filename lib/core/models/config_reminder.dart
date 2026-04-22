@@ -2,12 +2,14 @@ class ConfigRecordatorios {
   final int? idRecordatorio;
   final String titulo;
   final String hora;
+  final String frecuencia;
   final bool activo;
 
   ConfigRecordatorios({
     this.idRecordatorio,
     required this.titulo,
     required this.hora,
+    required this.frecuencia,
     this.activo = true,
   });
 
@@ -16,7 +18,8 @@ class ConfigRecordatorios {
       'id_recordatorio': idRecordatorio,
       'titulo': titulo,
       'hora': hora,
-      'activo': activo ? 1 : 0, 
+      'frecuencia': frecuencia,
+      'activo': activo ? 1 : 0,
     };
   }
 
@@ -25,7 +28,8 @@ class ConfigRecordatorios {
       idRecordatorio: map['id_recordatorio'],
       titulo: map['titulo'],
       hora: map['hora'],
-      activo: map['activo'] == 1, 
+      frecuencia: map['frecuencia'],
+      activo: map['activo'] == 1,
     );
   }
 }

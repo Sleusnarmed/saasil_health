@@ -4,7 +4,7 @@ import '../home/home.dart';
 import '../insulin/insulin.dart';
 import '../history/history.dart';
 import '../chat/chat.dart';
-import '../reminders/reminders.dart';
+import '../reminders/reminder.dart';
 
 class MainPage extends StatefulWidget {
   const MainPage({super.key});
