@@ -4,7 +4,7 @@ import '../home/home.dart';
 import '../insulin/insulin.dart';
 import '../history/history.dart';
 import '../chat/chat.dart';
-// import '../reminders/reminders_page.dart';
+import '../reminders/reminders.dart';
 
 class MainPage extends StatefulWidget {
   const MainPage({super.key});
@@ -133,7 +133,7 @@ class _MainPageState extends State<MainPage> {
     const HomePage(),
     const HistoryPage(),
     const ChatPage(),
-    const Center(child: Text("Avisos (Simulado)")),
+    const RemindersPage(),
   ];
 
   @override
