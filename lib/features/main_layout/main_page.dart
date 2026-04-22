@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:saasil_health/features/glucose/glucose.dart';
 import '../../core/theme/app_theme.dart';
 import '../home/home.dart';
 import '../insulin/insulin.dart';
@@ -69,12 +70,12 @@ class _MainPageState extends State<MainPage> {
                   subtitle: 'Añade tu medición más reciente',
                   onTap: () {
                     Navigator.pop(context);
-                    // Navigator.push(
-                    //   context,
-                    //   MaterialPageRoute(
-                    //     builder: (context) => const GlucoseLogPage(), // Tu pantalla
-                    //   ),
-                    // );
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const GlucoseLogPage(),
+                      ),
+                    );
                   },
                 ),
 

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:saasil_health/features/glucose/glucose.dart';
 import '../../core/theme/app_theme.dart';
 import '../insulin/insulin.dart';
 
@@ -87,7 +88,14 @@ class HomePage extends StatelessWidget {
                     title: "Glucosa",
                     icon: Icons.bloodtype_outlined,
                     color: AppTheme.colorError,
-                    onTap: () {},
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const GlucoseLogPage(),
+                        ),
+                      );
+                    },
                   ),
                 ),
               ],
