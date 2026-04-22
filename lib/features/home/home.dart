@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:saasil_health/features/glucose/glucose.dart';
+import 'package:saasil_health/features/symptoms/symptoms.dart';
 import '../../core/theme/app_theme.dart';
 import '../insulin/insulin.dart';
 
@@ -111,7 +112,14 @@ class HomePage extends StatelessWidget {
                   title: "Registrar Síntoma",
                   icon: Icons.sentiment_dissatisfied_outlined,
                   color: AppTheme.colorTertiary,
-                  onTap: () {},
+                  onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const SymptomsLogPage(),
+                        ),
+                      );
+                    },
                 ),
               ),
             ),

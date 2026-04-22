@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:saasil_health/features/glucose/glucose.dart';
+import 'package:saasil_health/features/symptoms/symptoms.dart';
 import '../../core/theme/app_theme.dart';
 import '../home/home.dart';
 import '../insulin/insulin.dart';
@@ -86,12 +87,12 @@ class _MainPageState extends State<MainPage> {
                   subtitle: 'Registra cómo te sientes hoy',
                   onTap: () {
                     Navigator.pop(context);
-                    // Navigator.push(
-                    //   context,
-                    //   MaterialPageRoute(
-                    //     builder: (context) => const SymptomsLogPage(), // Tu pantalla
-                    //   ),
-                    // );
+                     Navigator.push(
+                       context,
+                      MaterialPageRoute(
+                        builder: (context) => const SymptomsLogPage(),
+                       ),
+                     );
                   },
                 ),
               ],
@@ -131,8 +132,8 @@ class _MainPageState extends State<MainPage> {
 
   int _currentIndex = 0;
   final List<Widget> _pages = [
-    const HomePage(),
-    const HistoryPage(),
+    HomePage(),
+    HistoryPage(),
     const ChatPage(),
     const RemindersPage(),
   ];
