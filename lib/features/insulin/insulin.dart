@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../core/theme/app_theme.dart';
-import 'package:saasil_health/core/models/reg_insulin.dart';
+import '../../core/models/reg_insulin.dart';
 import '../../core/database/database_helper.dart';
 
 class InsulinLogPage extends StatefulWidget {
@@ -11,80 +11,95 @@ class InsulinLogPage extends StatefulWidget {
 }
 
 class _InsulinLogPageState extends State<InsulinLogPage> {
-  final TextEditingController _unitsController = TextEditingController();
+  final TextEditingController _doseController = TextEditingController();
+  final TextEditingController _notesController = TextEditingController();
+
   DateTime _selectedDate = DateTime.now();
   TimeOfDay _selectedTime = TimeOfDay.now();
 
-  List<Map<String, dynamic>> _recentHistory = [];
-  bool _isLoadingHistory = true;
-  String _dayLabel = ""; 
-
-  final Map<String, List<String>> _insulinaData = {
-    'Acción Rápida': ['Aspart', 'Lispro', 'Glusilina'],
-    'Acción Corta': ['Regular'],
-    'Acción Intermedia': ['NPH'],
-    'Acción Prolongada': ['Glargina', 'Detemir', 'Degludec'],
-    'Inhalada': ['Polvo de insulina humana'],
-  };
-
-  String? _selectedCategory;
-  String? _selectedSubtype;
+  String? _selectedActionType;
+  final List<String> _actionTypes = [
+    'Rápida',
+    'Corta',
+    'Intermedia',
+    'Prolongada',
+  ];
 
   @override
-  void initState() {
-    super.initState();
-    _loadHistory(); 
+  void dispose() {
+    _doseController.dispose();
+    _notesController.dispose();
+    super.dispose();
   }
 
-  Future<void> _loadHistory() async {
+  Future<void> _saveEntry() async {
+    final doseText = _doseController.text;
+    final dose = int.tryParse(doseText) ?? 0;
+    final notesText = _notesController.text;
+
+    if (dose == 0 || _selectedActionType == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+              'Por favor, ingresa una dosis válida y selecciona un tipo de acción.'),
+        ),
+      );
+      return;
+    }
+
+    final finalDateTime = DateTime(
+      _selectedDate.year,
+      _selectedDate.month,
+      _selectedDate.day,
+      _selectedTime.hour,
+      _selectedTime.minute,
+    );
+
+    // Sumamos 1 al index para que empate con los IDs de tu catálogo (1, 2, 3...)
+    // evitando así errores de Foreign Key en SQLite.
+    final newEntry = RegInsulina(
+      unidades: dose,
+      idTipoInsu: _actionTypes.indexOf(_selectedActionType!) + 1,
+      fechaHora: finalDateTime,
+      notas: notesText.trim().isNotEmpty ? notesText.trim() : null,
+    );
+
     try {
+      // 1. Abrimos la instancia de la BD
       final db = await DatabaseHelper.instance.database;
       
-      final List<Map<String, dynamic>> result = await db.rawQuery('''
-        SELECT r.unidades, r.fecha_hora, c.categoria, c.subtipo 
-        FROM ${DatabaseHelper.tableRegInsulina} r
-        INNER JOIN ${DatabaseHelper.tableCatTipoInsulina} c ON r.id_tipo_insu = c.id_tipo_insu
-        ORDER BY r.fecha_hora DESC
-      ''');
-
-      final now = DateTime.now();
-      final today = DateTime(now.year, now.month, now.day);
-      final yesterday = today.subtract(const Duration(days: 1));
-      
-      List<Map<String, dynamic>> todayLogs = [];
-      List<Map<String, dynamic>> yesterdayLogs = [];
-
-      for (var row in result) {
-        DateTime logDate = DateTime.parse(row['fecha_hora']);
-        DateTime logDay = DateTime(logDate.year, logDate.month, logDate.day);
-        
-        if (logDay == today) {
-          todayLogs.add(row);
-        } else if (logDay == yesterday) {
-          yesterdayLogs.add(row);
-        }
-      }
+      // 2. Insertamos el registro
+      await db.insert(
+        DatabaseHelper.tableRegInsulina,
+        newEntry.toMap(),
+      );
 
       if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('¡Registro de insulina guardado correctamente!'),
+            backgroundColor: Colors.green,
+          ),
+        );
+        
+        // Limpiamos o regresamos
+        _doseController.clear();
+        _notesController.clear();
         setState(() {
-          if (todayLogs.isNotEmpty) {
-            _recentHistory = todayLogs;
-            _dayLabel = "HOY";
-          } else if (yesterdayLogs.isNotEmpty) {
-            _recentHistory = yesterdayLogs;
-            _dayLabel = "AYER";
-          } else {
-            _recentHistory = []; 
-            _dayLabel = "";
-          }
-          _isLoadingHistory = false;
+          _selectedActionType = null;
         });
+        
+        // Opcional: si quieres que se cierre la pantalla tras guardar, descomenta la siguiente línea
+        // Navigator.pop(context);
       }
     } catch (e) {
       if (mounted) {
-        setState(() {
-          _isLoadingHistory = false; // Apagamos el loading para que no se quede trabado
-        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error al guardar: $e'),
+            backgroundColor: AppTheme.colorError,
+          ),
+        );
       }
     }
   }
@@ -94,13 +109,13 @@ class _InsulinLogPageState extends State<InsulinLogPage> {
       context: context,
       initialDate: _selectedDate,
       firstDate: DateTime(2020),
-      lastDate: DateTime.now(),
+      lastDate: DateTime(2030),
       builder: (context, child) {
         return Theme(
           data: Theme.of(context).copyWith(
             colorScheme: const ColorScheme.light(
               primary: AppTheme.colorPrimary,
-              onPrimary: AppTheme.colorTextSecondary,
+              onPrimary: Colors.white,
               onSurface: AppTheme.colorTextPrimary,
             ),
           ),
@@ -124,6 +139,8 @@ class _InsulinLogPageState extends State<InsulinLogPage> {
           data: Theme.of(context).copyWith(
             colorScheme: const ColorScheme.light(
               primary: AppTheme.colorPrimary,
+              onPrimary: Colors.white,
+              onSurface: AppTheme.colorTextPrimary,
             ),
           ),
           child: child!,
@@ -137,207 +154,93 @@ class _InsulinLogPageState extends State<InsulinLogPage> {
     }
   }
 
-  void _showCategoryPicker() {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: AppTheme.colorBgSecondary,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (context) {
-        return SafeArea(
-          child: Wrap(
-            children: _insulinaData.keys.map((category) {
-              return ListTile(
-                contentPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
-                title: Text(category, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w600)),
-                trailing: const Icon(Icons.arrow_forward_ios, color: AppTheme.colorPrimary),
-                onTap: () {
-                  setState(() {
-                    _selectedCategory = category;
-                    if (_insulinaData[category]!.length == 1) {
-                      _selectedSubtype = _insulinaData[category]![0];
-                    } else {
-                      _selectedSubtype = null; 
-                    }
-                  });
-                  Navigator.pop(context);
-                },
-              );
-            }).toList(),
-          ),
-        );
-      },
+  // Decoración reutilizable para usar los colores de tu AppTheme
+  BoxDecoration _inputDecoration() {
+    return BoxDecoration(
+      color: AppTheme.colorBgSecondary, // Fondo blanco de tu tema
+      borderRadius: BorderRadius.circular(15),
+      border: Border.all(color: Colors.grey.shade300, width: 1), // Borde sutil para que resalte
     );
-  }
-
-  void _showSubtypePicker() {
-    if (_selectedCategory == null) return;
-
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: AppTheme.colorBgSecondary,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (context) {
-        return SafeArea(
-          child: Wrap(
-            children: _insulinaData[_selectedCategory]!.map((subtype) {
-              return ListTile(
-                contentPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
-                title: Text(subtype, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w600)),
-                trailing: const Icon(Icons.check_circle_outline, color: AppTheme.colorPrimary),
-                onTap: () {
-                  setState(() {
-                    _selectedSubtype = subtype;
-                  });
-                  Navigator.pop(context);
-                },
-              );
-            }).toList(),
-          ),
-        );
-      },
-    );
-  }
-
-  Future<void> _saveEntry() async {
-    final units = _unitsController.text;
-    
-    if (units.isEmpty || _selectedCategory == null || _selectedSubtype == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Por favor, completa todos los campos', style: TextStyle(fontSize: 16)),
-          backgroundColor: AppTheme.colorError,
-        ),
-      );
-      return;
-    }
-
-    try {
-      final db = await DatabaseHelper.instance.database;
-      final List<Map<String, dynamic>> resultado = await db.query(
-        DatabaseHelper.tableCatTipoInsulina,
-        where: 'categoria = ? AND subtipo = ?',
-        whereArgs: [_selectedCategory, _selectedSubtype],
-      );
-      
-      if (resultado.isNotEmpty) {
-        final int idTipoInsu = resultado.first['id_tipo_insu'];
-        
-        final nuevoRegistro = RegInsulina(
-          unidades: int.parse(units), 
-          idTipoInsu: idTipoInsu,
-          fechaHora: DateTime(
-            _selectedDate.year, _selectedDate.month, _selectedDate.day,
-            _selectedTime.hour, _selectedTime.minute
-          ),
-        );
-        
-        await db.insert(DatabaseHelper.tableRegInsulina, nuevoRegistro.toMap());
-
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: const Text('¡Registro guardado correctamente!', style: TextStyle(fontSize: 16)),
-              backgroundColor: AppTheme.colorPrimary,
-              behavior: SnackBarBehavior.floating,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-            ),
-          );
-          
-          setState(() {
-            _unitsController.clear();
-            _selectedCategory = null;
-            _selectedSubtype = null;
-          });
-
-          _loadHistory(); // RSe recarga automaticamente
-        }
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Error: No se encontró este tipo de insulina en la base de datos.', style: TextStyle(fontSize: 16)),
-            backgroundColor: Colors.orange,
-          ),
-        );
-      }
-    } catch (e) {
-      print("🚨 ERROR AL GUARDAR: $e");
-    }
-  }
-
-  @override
-  void dispose() {
-    _unitsController.dispose();
-    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
-
     return Scaffold(
-      backgroundColor: AppTheme.colorBackground,
+      backgroundColor: AppTheme.colorBackground, // Fondo gris/azulado claro de tu tema
       appBar: AppBar(
-        backgroundColor: AppTheme.colorBackground,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: AppTheme.colorPrimary, size: 28),
-          onPressed: () => Navigator.pop(context),
+        title: const Text(
+          'Registro de Insulina',
+          style: TextStyle(fontWeight: FontWeight.bold, color: AppTheme.colorTextPrimary),
         ),
-        title: Text('Registro de Insulina', style: textTheme.titleLarge),
+        backgroundColor: Colors.transparent, // Transparente para que tome el colorBackground
+        elevation: 0,
+        centerTitle: true,
+        iconTheme: const IconThemeData(color: AppTheme.colorPrimary),
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(20.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Dosis (Unidades)', style: textTheme.titleMedium),
+            const Text(
+              'Dosis (Unidades)',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppTheme.colorTextPrimary),
+            ),
             const SizedBox(height: 8),
-            TextField(
-              controller: _unitsController,
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
-              style: textTheme.displayLarge?.copyWith(fontSize: 28),
-              decoration: InputDecoration(
-                hintText: '0.0',
-                filled: true,
-                fillColor: AppTheme.colorBgSecondary,
-                suffixIcon: const Padding(
-                  padding: EdgeInsets.all(12.0),
-                  child: Icon(Icons.vaccines, color: AppTheme.colorPrimary, size: 32),
+            Container(
+              decoration: _inputDecoration(),
+              child: TextField(
+                controller: _doseController,
+                keyboardType: TextInputType.number,
+                style: const TextStyle(color: AppTheme.colorTextPrimary),
+                decoration: const InputDecoration(
+                  hintText: '0.0',
+                  suffixIcon: Icon(Icons.vaccines, color: AppTheme.colorPrimary),
+                  border: InputBorder.none,
+                  contentPadding: EdgeInsets.symmetric(horizontal: 20, vertical: 15),
                 ),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(15),
-                  borderSide: BorderSide.none,
-                ),
-                contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
               ),
             ),
             const SizedBox(height: 20),
 
-            Text('Tipo de Acción', style: textTheme.titleMedium),
+            const Text(
+              'Tipo de Acción',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppTheme.colorTextPrimary),
+            ),
             const SizedBox(height: 8),
-            _buildLargeSelectionButton(
-              text: _selectedCategory ?? 'Toca para seleccionar',
-              icon: Icons.speed,
-              isPlaceholder: _selectedCategory == null,
-              onTap: _showCategoryPicker,
+            Container(
+              decoration: _inputDecoration(),
+              child: DropdownButtonHideUnderline(
+                child: DropdownButton<String>(
+                  value: _selectedActionType,
+                  hint: Padding(
+                    padding: const EdgeInsets.only(left: 20.0),
+                    child: Text('Toca para seleccionar', style: TextStyle(color: Colors.grey.shade500)),
+                  ),
+                  icon: const Padding(
+                    padding: EdgeInsets.only(right: 20.0),
+                    child: Icon(Icons.keyboard_arrow_down, color: AppTheme.colorPrimary),
+                  ),
+                  isExpanded: true,
+                  dropdownColor: AppTheme.colorBgSecondary,
+                  onChanged: (String? newValue) {
+                    setState(() {
+                      _selectedActionType = newValue;
+                    });
+                  },
+                  items: _actionTypes.map<DropdownMenuItem<String>>((String value) {
+                    return DropdownMenuItem<String>(
+                      value: value,
+                      child: Padding(
+                        padding: const EdgeInsets.only(left: 20.0),
+                        child: Text(value, style: const TextStyle(color: AppTheme.colorTextPrimary)),
+                      ),
+                    );
+                  }).toList(),
+                ),
+              ),
             ),
             const SizedBox(height: 20),
-
-            if (_selectedCategory != null) ...[
-              Text('Insulina Específica', style: textTheme.titleMedium),
-              const SizedBox(height: 8),
-              _buildLargeSelectionButton(
-                text: _selectedSubtype ?? 'Toca para elegir insulina',
-                icon: Icons.medication,
-                isPlaceholder: _selectedSubtype == null,
-                onTap: _insulinaData[_selectedCategory]!.length > 1 ? _showSubtypePicker : null,
-              ),
-              const SizedBox(height: 20),
-            ],
 
             Row(
               children: [
@@ -345,12 +248,27 @@ class _InsulinLogPageState extends State<InsulinLogPage> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('Fecha', style: textTheme.titleMedium),
+                      const Text(
+                        'Fecha',
+                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppTheme.colorTextPrimary),
+                      ),
                       const SizedBox(height: 8),
-                      _buildDateTimeField(
-                        text: "${_selectedDate.day}/${_selectedDate.month}/${_selectedDate.year}",
-                        icon: Icons.calendar_today,
+                      GestureDetector(
                         onTap: () => _selectDate(context),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
+                          decoration: _inputDecoration(),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                '${_selectedDate.day}/${_selectedDate.month}/${_selectedDate.year}',
+                                style: const TextStyle(fontSize: 16, color: AppTheme.colorTextPrimary),
+                              ),
+                              const Icon(Icons.calendar_today, color: AppTheme.colorPrimary),
+                            ],
+                          ),
+                        ),
                       ),
                     ],
                   ),
@@ -360,12 +278,27 @@ class _InsulinLogPageState extends State<InsulinLogPage> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('Hora', style: textTheme.titleMedium),
+                      const Text(
+                        'Hora',
+                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppTheme.colorTextPrimary),
+                      ),
                       const SizedBox(height: 8),
-                      _buildDateTimeField(
-                        text: _selectedTime.format(context),
-                        icon: Icons.access_time,
+                      GestureDetector(
                         onTap: () => _selectTime(context),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
+                          decoration: _inputDecoration(),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                _selectedTime.format(context),
+                                style: const TextStyle(fontSize: 16, color: AppTheme.colorTextPrimary),
+                              ),
+                              const Icon(Icons.access_time, color: AppTheme.colorPrimary),
+                            ],
+                          ),
+                        ),
                       ),
                     ],
                   ),
@@ -374,153 +307,53 @@ class _InsulinLogPageState extends State<InsulinLogPage> {
             ),
             const SizedBox(height: 30),
 
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: _saveEntry,
-                style: ElevatedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 20),
-                  backgroundColor: AppTheme.colorPrimary,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+            const Text(
+              'Notas (opcional · máx. 255 caracteres)',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppTheme.colorTextPrimary),
+            ),
+            const SizedBox(height: 8),
+            Container(
+              decoration: _inputDecoration(),
+              child: TextField(
+                controller: _notesController,
+                maxLines: 6,
+                minLines: 3,
+                maxLength: 255,
+                style: const TextStyle(color: AppTheme.colorTextPrimary),
+                decoration: InputDecoration(
+                  hintText: 'Ej: Aplicada en el abdomen antes del desayuno...',
+                  hintStyle: TextStyle(color: Colors.grey.shade500),
+                  border: InputBorder.none,
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
                 ),
-                child: Text('Guardar Entrada', style: textTheme.titleMedium?.copyWith(color: AppTheme.colorTextSecondary, fontSize: 20)),
               ),
             ),
             const SizedBox(height: 40),
-            if (_isLoadingHistory)
-              const Center(child: CircularProgressIndicator(color: AppTheme.colorPrimary))
-            else if (_recentHistory.isEmpty)
-              const SizedBox.shrink() 
-            else ...[
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Row(
-                    children: [
-                      const Icon(Icons.history, color: Colors.grey),
-                      const SizedBox(width: 8),
-                      Text('Historial Reciente', style: textTheme.titleMedium),
-                    ],
+
+            // Botón de Guardar
+            SizedBox(
+              width: double.infinity,
+              height: 60,
+              child: ElevatedButton(
+                onPressed: _saveEntry,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppTheme.colorPrimary,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(15),
                   ),
-                ],
-              ),
-              const SizedBox(height: 10),
-              Text(_dayLabel, style: textTheme.bodySmall?.copyWith(letterSpacing: 1.2, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 10),
-
-              ..._recentHistory.map((log) {
-                DateTime logDate = DateTime.parse(log['fecha_hora']);
-                String formattedTime = TimeOfDay.fromDateTime(logDate).format(context);
-                
-                return _buildHistoryCard(
-                  context, 
-                  units: log['unidades'].toString(), 
-                  type: "${log['categoria']} (${log['subtipo']})", 
-                  time: formattedTime, 
-                  icon: Icons.water_drop
-                );
-              }),
-            ]
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildLargeSelectionButton({
-    required String text, 
-    required IconData icon, 
-    required bool isPlaceholder, 
-    VoidCallback? onTap
-  }) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(15),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
-        decoration: BoxDecoration(
-          color: isPlaceholder ? AppTheme.colorBgSecondary : AppTheme.colorPrimary.withOpacity(0.05),
-          borderRadius: BorderRadius.circular(15),
-          border: Border.all(
-            color: isPlaceholder ? Colors.grey.shade300 : AppTheme.colorPrimary,
-            width: isPlaceholder ? 1 : 2,
-          ),
-        ),
-        child: Row(
-          children: [
-            Icon(icon, color: isPlaceholder ? Colors.grey : AppTheme.colorPrimary, size: 28),
-            const SizedBox(width: 15),
-            Expanded(
-              child: Text(
-                text,
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: isPlaceholder ? FontWeight.normal : FontWeight.bold,
-                  color: isPlaceholder ? Colors.grey.shade600 : AppTheme.colorPrimary,
+                ),
+                child: const Text(
+                  'Guardar Entrada',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: AppTheme.colorTextSecondary, 
+                  ),
                 ),
               ),
             ),
-            if (onTap != null) 
-              Icon(Icons.keyboard_arrow_down, color: isPlaceholder ? Colors.grey : AppTheme.colorPrimary),
           ],
         ),
-      ),
-    );
-  }
-
-  Widget _buildDateTimeField({required String text, required IconData icon, required VoidCallback onTap}) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(15),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-        decoration: BoxDecoration(
-          color: AppTheme.colorBgSecondary,
-          borderRadius: BorderRadius.circular(15),
-          border: Border.all(color: Colors.grey.shade300),
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(text, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
-            Icon(icon, color: AppTheme.colorPrimary),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildHistoryCard(BuildContext context, {required String units, required String type, required String time, required IconData icon}) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppTheme.colorBgSecondary,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 10, offset: const Offset(0, 2))],
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: AppTheme.colorSecondary.withOpacity(0.2),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(icon, color: AppTheme.colorPrimary, size: 24),
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text("$units Unidades", style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
-                const SizedBox(height: 4),
-                Text("$type • $time", style: Theme.of(context).textTheme.bodySmall),
-              ],
-            ),
-          ),
-        ],
       ),
     );
   }

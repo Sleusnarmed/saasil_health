@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/database/database_helper.dart';
 
 class HistoryPage extends StatefulWidget {
   const HistoryPage({super.key});
@@ -10,6 +11,8 @@ class HistoryPage extends StatefulWidget {
 
 class _HistoryPageState extends State<HistoryPage> {
   String _selectedFilter = 'Todos';
+  bool _isLoading = true;
+  List<Map<String, dynamic>> _historyData = [];
 
   final List<Map<String, dynamic>> _filters = [
     {'label': 'Todos', 'icon': null},
@@ -18,52 +21,124 @@ class _HistoryPageState extends State<HistoryPage> {
     {'label': 'Síntomas', 'icon': Icons.sentiment_dissatisfied},
   ];
 
-  final List<Map<String, dynamic>> _mockData = [
-    {
-      'type': 'Glucosa',
-      'title': '220 mg/dL — Hiperglucemia',
-      'subtitle': '14 abr · 1:00 pm · Después de comer',
-      'statusText': 'Alto',
-      'statusIcon': Icons.arrow_upward,
-      'color': Colors.orange,
-      'icon': Icons.water_drop,
-    },
-    {
-      'type': 'Glucosa',
-      'title': '115 mg/dL — Normal',
-      'subtitle': '14 abr · 8:05 am · Antes de comer',
-      'statusText': 'Normal',
-      'statusIcon': Icons.check,
-      'color': Colors.green,
-      'icon': Icons.water_drop,
-    },
-    {
-      'type': 'Glucosa',
-      'title': '62 mg/dL — Hipoglucemia',
-      'subtitle': '12 abr · 6:10 am · En ayunas',
-      'statusText': 'Bajo',
-      'statusIcon': Icons.warning_amber_rounded,
-      'color': Colors.red,
-      'icon': Icons.water_drop,
-    },
-    {
-      'type': 'Insulina',
-      'title': '12 Unidades — Rápida',
-      'subtitle': '12 abr · 2:00 pm · Aspart',
-      'statusText': 'Registrado',
-      'statusIcon': Icons.check_circle_outline,
-      'color': AppTheme.colorPrimary,
-      'icon': Icons.vaccines,
-    },
-  ];
+  @override
+  void initState() {
+    super.initState();
+    _loadHistoryData();
+  }
+
+  String _formatDate(DateTime date) {
+    const months = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+    return '${date.day} ${months[date.month - 1]}';
+  }
+
+  String _formatTime(DateTime date) {
+    int h = date.hour;
+    String m = date.minute.toString().padLeft(2, '0');
+    String period = h >= 12 ? 'pm' : 'am';
+    h = h % 12;
+    if (h == 0) h = 12;
+    return '$h:$m $period';
+  }
+
+  Future<void> _loadHistoryData() async {
+    setState(() => _isLoading = true);
+    final db = await DatabaseHelper.instance.database;
+    List<Map<String, dynamic>> combinedData = [];
+
+    final glucosaRecords = await db.query(DatabaseHelper.tableRegGlucosa);
+    for (var row in glucosaRecords) {
+      final fecha = DateTime.parse(row['fecha_hora'] as String);
+      final valor = row['valor'] as int;
+      final momento = row['momento_dia'] as String;
+      
+      String statusText = 'Normal';
+      IconData statusIcon = Icons.check;
+      Color color = Colors.green;
+      String titleSufix = 'Normal';
+
+      if (valor < 70) {
+        statusText = 'Bajo';
+        statusIcon = Icons.warning_amber_rounded;
+        color = Colors.red;
+        titleSufix = 'Hipoglucemia';
+      } else if (valor > 140) { 
+        statusText = 'Alto';
+        statusIcon = Icons.arrow_upward;
+        color = Colors.orange;
+        titleSufix = 'Hiperglucemia';
+      }
+
+      combinedData.add({
+        'type': 'Glucosa',
+        'title': '$valor mg/dL — $titleSufix',
+        'subtitle': '${_formatDate(fecha)} · ${_formatTime(fecha)} · $momento',
+        'statusText': statusText,
+        'statusIcon': statusIcon,
+        'color': color,
+        'icon': Icons.water_drop,
+        'timestamp': fecha, 
+      });
+    }
+
+    final insulinaRecords = await db.rawQuery('''
+      SELECT r.*, c.subtipo 
+      FROM ${DatabaseHelper.tableRegInsulina} r
+      JOIN ${DatabaseHelper.tableCatTipoInsulina} c 
+      ON r.id_tipo_insu = c.id_tipo_insu
+    ''');
+    
+    for (var row in insulinaRecords) {
+      final fecha = DateTime.parse(row['fecha_hora'] as String);
+      final unidades = row['unidades'] as int;
+      final subtipo = row['subtipo'] as String;
+
+      combinedData.add({
+        'type': 'Insulina',
+        'title': '$unidades Unidades — $subtipo',
+        'subtitle': '${_formatDate(fecha)} · ${_formatTime(fecha)}',
+        'statusText': 'Registrado',
+        'statusIcon': Icons.check_circle_outline,
+        'color': AppTheme.colorPrimary,
+        'icon': Icons.vaccines,
+        'timestamp': fecha,
+      });
+    }
+
+    final sintomasRecords = await db.query(DatabaseHelper.tableRegSintomas);
+    for (var row in sintomasRecords) {
+      final fecha = DateTime.parse(row['fecha_hora'] as String);
+      final severidad = row['severidad'] as String;
+      final notas = row['notas'] as String? ?? 'Sin notas';
+      Color colorSintoma = Colors.purple.shade400;
+      if (severidad.toLowerCase() == 'alta') colorSintoma = AppTheme.colorError;
+
+      combinedData.add({
+        'type': 'Síntomas',
+        'title': 'Severidad: $severidad',
+        'subtitle': '${_formatDate(fecha)} · ${_formatTime(fecha)} · $notas',
+        'statusText': 'Registrado',
+        'statusIcon': Icons.sentiment_dissatisfied,
+        'color': colorSintoma,
+        'icon': Icons.sentiment_dissatisfied,
+        'timestamp': fecha,
+      });
+    }
+
+    combinedData.sort((a, b) => (b['timestamp'] as DateTime).compareTo(a['timestamp'] as DateTime));
+
+    setState(() {
+      _historyData = combinedData;
+      _isLoading = false;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
-
     final filteredData = _selectedFilter == 'Todos'
-        ? _mockData
-        : _mockData.where((item) => item['type'] == _selectedFilter).toList();
+        ? _historyData
+        : _historyData.where((item) => item['type'] == _selectedFilter).toList();
 
     return Scaffold(
       backgroundColor: AppTheme.colorBackground,
@@ -76,7 +151,9 @@ class _HistoryPageState extends State<HistoryPage> {
           style: textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
         ),
       ),
-      body: Column(
+      body: _isLoading 
+        ? const Center(child: CircularProgressIndicator(color: AppTheme.colorPrimary))
+        : Column(
         children: [
           Container(
             padding: const EdgeInsets.symmetric(vertical: 10),
@@ -125,10 +202,8 @@ class _HistoryPageState extends State<HistoryPage> {
                           _selectedFilter = filter['label'];
                         });
                       },
-                      selectedColor:
-                          AppTheme.colorPrimary, 
-                      backgroundColor:
-                          Colors.white, 
+                      selectedColor: AppTheme.colorPrimary, 
+                      backgroundColor: Colors.white, 
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(20),
                         side: BorderSide(
@@ -148,9 +223,16 @@ class _HistoryPageState extends State<HistoryPage> {
           Expanded(
             child: filteredData.isEmpty
                 ? Center(
-                    child: Text(
-                      'No hay registros de $_selectedFilter',
-                      style: TextStyle(color: Colors.grey.shade600),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.inbox, size: 64, color: Colors.grey.shade300),
+                        const SizedBox(height: 16),
+                        Text(
+                          'No hay registros de $_selectedFilter',
+                          style: TextStyle(color: Colors.grey.shade600, fontSize: 16),
+                        ),
+                      ],
                     ),
                   )
                 : ListView.builder(
@@ -186,12 +268,9 @@ class _HistoryPageState extends State<HistoryPage> {
   }) {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
-      clipBehavior:
-          Clip.antiAlias,
+      clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
-        color: color.withOpacity(
-          0.03,
-        ), 
+        color: color.withOpacity(0.03), 
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: color.withOpacity(0.3), width: 1),
         boxShadow: [
@@ -207,7 +286,6 @@ class _HistoryPageState extends State<HistoryPage> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Container(width: 6, color: color),
-
             Expanded(
               child: Padding(
                 padding: const EdgeInsets.all(16),
@@ -223,7 +301,6 @@ class _HistoryPageState extends State<HistoryPage> {
                       child: Icon(icon, color: color, size: 24),
                     ),
                     const SizedBox(width: 16),
-
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -248,7 +325,6 @@ class _HistoryPageState extends State<HistoryPage> {
                       ),
                     ),
                     const SizedBox(width: 8),
-
                     Container(
                       padding: const EdgeInsets.symmetric(
                         horizontal: 8,
